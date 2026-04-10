@@ -43,6 +43,7 @@ import {
   StreamPrecomputer as Precomputer,
   StreamUtils,
   StreamContext,
+  TorrServerConverter,
   populateNzbFallbacks,
   preloadStreams,
 } from './streams/index.js';
@@ -161,6 +162,7 @@ export class AIOStreams {
   private sorter: Sorter;
   private precomputer: Precomputer;
   private streamContext: StreamContext | null = null;
+  private torrServerConverter: TorrServerConverter;
 
   private addonInitialisationErrors: {
     addon: Addon | Preset;
@@ -181,6 +183,7 @@ export class AIOStreams {
     this.fetcher = new Fetcher(userData, this.filterer, this.precomputer);
     this.deduplicator = new Deduplicator(userData);
     this.sorter = new Sorter(userData);
+    this.torrServerConverter = new TorrServerConverter(userData);
   }
 
   private setUserData(userData: UserData) {
@@ -2693,6 +2696,9 @@ export class AIOStreams {
       filterMs = Date.now() - filterStart;
     }
 
+    // Convert P2P streams to TorrServer URLs if TorrServer is configured
+    processedStreams = await this.torrServerConverter.convert(processedStreams);
+    
     const dedupStart = Date.now();
     processedStreams = await this.deduplicator.deduplicate(processedStreams);
     deduplicationMs = Date.now() - dedupStart;
