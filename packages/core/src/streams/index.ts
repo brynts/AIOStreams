@@ -5,6 +5,7 @@ import StreamDeduplicator from './deduplicator.js';
 import StreamPrecomputer from './precomputer.js';
 import StreamUtils from './utils.js';
 import { StreamContext, ExtendedMetadata } from './context.js';
+import TorrServerConverter from './torrserver-converter.js';
 
 export {
   StreamFetcher,
@@ -14,6 +15,7 @@ export {
   StreamPrecomputer,
   StreamUtils,
   StreamContext,
+  TorrServerConverter,
 };
 
 export type { ExtendedMetadata };
