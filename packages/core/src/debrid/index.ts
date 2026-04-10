@@ -4,6 +4,7 @@ export * from './stremthru.js';
 export * from './torbox.js';
 export * from './nzbdav.js';
 export * from './altmount.js';
+export * from './torrserver.js';
 
 import {
   Env,
@@ -19,6 +20,7 @@ import { NzbDAVService } from './nzbdav.js';
 import { AltmountService } from './altmount.js';
 import { StremioNNTPService } from './stremio-nntp.js';
 import { EasynewsService } from './easynews.js';
+import { TorrServerDebridService } from './torrserver.js';
 
 export function getDebridService(
   serviceName: ServiceId,
@@ -77,6 +79,8 @@ export function getDebridService(
       return new EasynewsService(config);
     case 'stremthru_newz':
       return createStremThruNewzService(config, pollInterval, maxWaitTime);
+    case 'torrserver':
+      return new TorrServerDebridService(config);
     default:
       if (StremThruPreset.supportedServices.includes(serviceName)) {
         return new StremThruService({
