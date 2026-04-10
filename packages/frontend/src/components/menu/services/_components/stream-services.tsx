@@ -78,6 +78,7 @@ const SERVICE_LOGO_MAP: Record<ServiceId, string> = {
     'https://raw.githubusercontent.com/nzbdav-dev/nzbdav/refs/heads/main/frontend/public/logo.svg',
   altmount:
     'https://raw.githubusercontent.com/javi11/altmount/refs/heads/main/docs/static/img/logo.png',
+  torrserver: 'https://raw.githubusercontent.com/YouROK/TorrServer/refs/heads/master/server/web/pages/template/pages/icon.png',
 };
 
 function ServiceLogo({
