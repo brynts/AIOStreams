@@ -42,7 +42,7 @@ RUN rm -rf packages/server/node_modules
 RUN rm -rf packages/frontend/node_modules
 
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
-RUN pnpm rebuild
+RUN cd packages/core && pnpm rebuild better-sqlite3
 
 
 FROM base AS final
