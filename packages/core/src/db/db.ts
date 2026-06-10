@@ -38,37 +38,21 @@ export class DB {
   private constructor() {}
 
   static getInstance(): DB {
-    if (!this.instance) {
-      this.instance = new DB();
-    }
+    if (!this.instance) this.instance = new DB();
     return this.instance;
   }
 
-  isInitialised(): boolean {
-    return DB.initialised;
-  }
-
-  getDialect(): DBDialect {
-    return DB.dialect;
-  }
-
-  isSQLite(): boolean {
-    return this.getDialect() === 'sqlite';
-  }
+  isInitialised(): boolean { return DB.initialised; }
+  getDialect(): DBDialect { return DB.dialect; }
+  isSQLite(): boolean { return this.getDialect() === 'sqlite'; }
 
   getRowsAffected(result: any): number {
-    if (this.isSQLite()) {
-      return result.changes || result.rowCount || 0;
-    }
+    if (this.isSQLite()) return result.changes || result.rowCount || 0;
     return result.rowCount || 0;
   }
 
-  async initialise(
-    uri: string,
-    dsnModifiers: DSNModifier[] = []
-  ): Promise<void> {
+  async initialise(uri: string, dsnModifiers: DSNModifier[] = []): Promise<void> {
     if (DB.initialised) return;
-
     try {
       this.uri = parseConnectionURI(uri);
       this.dsnModifiers = dsnModifiers;
@@ -76,8 +60,7 @@ export class DB {
       await this.ping();
 
       for (const [name, schema] of Object.entries(TABLES)) {
-        const createTableQuery = `CREATE TABLE IF NOT EXISTS ${name} (${schema})`;
-        await this.execute(createTableQuery);
+        await this.execute(`CREATE TABLE IF NOT EXISTS ${name} (${schema})`);
       }
 
       if (this.uri.dialect === 'sqlite') {
@@ -98,57 +81,42 @@ export class DB {
 
   async open(): Promise<void> {
     if (this.uri.dialect === 'postgres') {
-      this.db = new Pool({
-        connectionString: this.uri.url.toString(),
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
-      });
-    } else if (this.uri.dialect === 'sqlite') {
-      const parentDir = path.dirname(this.uri.filename);
-      if (parentDir && !fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-      }
-      logger.debug(`Opening SQLite database: ${this.uri.filename}`);
+      this.db = new Pool({ connectionString: this.uri.url.toString() });
+    } else {
+      const dir = path.dirname(this.uri.filename);
+      if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       this.db = new Database(this.uri.filename);
     }
   }
 
   async close(): Promise<void> {
-    if (this.uri.dialect === 'postgres') {
-      await (this.db as Pool).end();
-    } else if (this.uri.dialect === 'sqlite') {
-      (this.db as Database.Database).close();
-    }
+    if (this.uri.dialect === 'postgres') await (this.db as Pool).end();
+    else (this.db as Database.Database).close();
   }
 
   async ping(): Promise<void> {
     if (this.uri.dialect === 'postgres') {
       await (this.db as Pool).query('SELECT 1');
-    } else if (this.uri.dialect === 'sqlite') {
+    } else {
       (this.db as Database.Database).prepare('SELECT 1').get();
     }
   }
 
   async execute(query: string, params?: any[]): Promise<any> {
-    const adaptedQuery = adaptQuery(query, this.uri.dialect);
-
+    const q = adaptQuery(query, this.uri.dialect);
     if (this.uri.dialect === 'postgres') {
-      return (this.db as Pool).query(adaptedQuery, params);
+      return (this.db as Pool).query(q, params);
     } else {
-      const stmt = (this.db as Database.Database).prepare(adaptedQuery);
-      return stmt.run(params || []);
+      return (this.db as Database.Database).prepare(q).run(params || []);
     }
   }
 
-  async query<T = QueryResultRow>(query: string, params?: any[]): Promise<T[]> {
-    const adaptedQuery = adaptQuery(query, this.uri.dialect);
-
+  async query<T = any>(query: string, params?: any[]): Promise<T[]> {
+    const q = adaptQuery(query, this.uri.dialect);
     if (this.uri.dialect === 'postgres') {
-      const result = await (this.db as Pool).query(adaptedQuery, params);
-      return result.rows;
+      return (await (this.db as Pool).query(q, params)).rows;
     } else {
-      const stmt = (this.db as Database.Database).prepare(adaptedQuery);
-      return stmt.all(params || []) as T[];
+      return (this.db as Database.Database).prepare(q).all(params || []) as T[];
     }
   }
 
@@ -156,59 +124,35 @@ export class DB {
     if (this.uri.dialect === 'postgres') {
       const client = await (this.db as Pool).connect();
       await client.query('BEGIN');
-
-      let finalised = false;
-      const finalise = () => {
-        if (!finalised) {
-          finalised = true;
-          client.release();
-        }
-      };
+      let done = false;
+      const finish = () => { if (!done) { done = true; client.release(); } };
 
       return {
-        commit: async () => {
-          try { await client.query('COMMIT'); } finally { finalise(); }
-        },
-        rollback: async () => {
-          try { await client.query('ROLLBACK'); } finally { finalise(); }
-        },
-        execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
-          const result = await client.query(adaptQuery(query, 'postgres'), params);
-          return {
-            rows: result.rows,
-            rowCount: result.rowCount || 0,
-            command: result.command,
-          };
+        commit: async () => { try { await client.query('COMMIT'); } finally { finish(); } },
+        rollback: async () => { try { await client.query('ROLLBACK'); } finally { finish(); } },
+        execute: async (q: string, p?: any[]) => {
+          const r = await client.query(adaptQuery(q, 'postgres'), p);
+          return { rows: r.rows, rowCount: r.rowCount || 0, command: r.command };
         },
       };
     } else {
       (this.db as Database.Database).exec('BEGIN');
-      let isFinalised = false;
+      let done = false;
 
       return {
-        commit: async () => {
-          if (isFinalised) return;
-          (this.db as Database.Database).exec('COMMIT');
-          isFinalised = true;
-        },
-        rollback: async () => {
-          if (isFinalised) return;
-          (this.db as Database.Database).exec('ROLLBACK');
-          isFinalised = true;
-        },
-        execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
-          if (isFinalised) throw new Error('Transaction has already been finalised.');
+        commit: async () => { if (!done) { (this.db as Database.Database).exec('COMMIT'); done = true; } },
+        rollback: async () => { if (!done) { (this.db as Database.Database).exec('ROLLBACK'); done = true; } },
+        execute: async (q: string, p?: any[]) => {
+          if (done) throw new Error('Transaction already finalised');
+          const stmt = (this.db as Database.Database).prepare(adaptQuery(q, 'sqlite'));
+          const cmd = q.trim().split(' ')[0].toUpperCase();
 
-          const adaptedQuery = adaptQuery(query, 'sqlite');
-          const command = adaptedQuery.trim().split(' ')[0].toUpperCase();
-          const stmt = (this.db as Database.Database).prepare(adaptedQuery);
-
-          if (['INSERT', 'UPDATE', 'DELETE'].includes(command)) {
-            const result = stmt.run(params || []);
-            return { rows: [], rowCount: result.changes || 0, command };
+          if (['INSERT','UPDATE','DELETE'].includes(cmd)) {
+            const r = stmt.run(p || []);
+            return { rows: [], rowCount: r.changes || 0, command: cmd };
           } else {
-            const rows = stmt.all(params || []);
-            return { rows, rowCount: rows.length, command };
+            const rows = stmt.all(p || []) as any[];
+            return { rows, rowCount: rows.length, command: cmd };
           }
         },
       };
