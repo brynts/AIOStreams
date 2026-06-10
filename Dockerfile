@@ -6,42 +6,36 @@ RUN corepack enable
 
 FROM base AS builder
 
+# Tambah build tools untuk compile better-sqlite3
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /build
 
-# Copy LICENSE file.
-COPY LICENSE ./
-
-# Copy the relevant package.json and package-lock.json files.
+# Copy package files dulu (caching lebih baik)
 COPY package*.json ./
 COPY packages/server/package*.json ./packages/server/
 COPY packages/core/package*.json ./packages/core/
 COPY packages/frontend/package*.json ./packages/frontend/
-COPY pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY pnpm-lock.yaml ./pnpm-lock.yaml
+COPY pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml ./
 
-# Install dependencies.
+# Install dependencies
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Copy source files.
+# Copy source code
 COPY tsconfig.*json ./
-
 COPY packages/server ./packages/server
 COPY packages/core ./packages/core
 COPY packages/frontend ./packages/frontend
 COPY scripts ./scripts
 COPY resources ./resources
+COPY LICENSE ./
 
-
-# Build the project.
+# Build
 RUN pnpm run build
 
-# Remove development dependencies.
-RUN rm -rf node_modules
-RUN rm -rf packages/core/node_modules
-RUN rm -rf packages/server/node_modules
-RUN rm -rf packages/frontend/node_modules
-
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+# === PERBAIKAN MEMORI & BETTER-SQLITE3 ===
+RUN pnpm prune --prod
 RUN cd packages/core && pnpm rebuild better-sqlite3
 
 
@@ -50,11 +44,10 @@ RUN apk add --no-cache curl
 
 WORKDIR /app
 
-# Copy the built files from the builder.
-# The package.json files must be copied as well for NPM workspace symlinks between local packages to work.
+# Copy hasil build
 COPY --from=builder /build/package*.json /build/LICENSE ./
-COPY --from=builder /build/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=builder /build/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /build/pnpm-workspace.yaml ./
+COPY --from=builder /build/pnpm-lock.yaml ./
 
 COPY --from=builder /build/packages/core/package.*json ./packages/core/
 COPY --from=builder /build/packages/frontend/package.*json ./packages/frontend/
@@ -72,9 +65,10 @@ COPY --from=builder /build/packages/core/node_modules ./packages/core/node_modul
 COPY --from=builder /build/packages/server/node_modules ./packages/server/node_modules
 COPY --from=builder /build/packages/frontend/node_modules ./packages/frontend/node_modules
 
+# Healthcheck & Port (sesuaikan kalau perlu)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -fsS http://localhost:${PORT:-3000}/api/v1/status || exit 1
+  CMD curl -fsS http://localhost:${PORT:-7860}/api/v1/status || exit 1
 
-EXPOSE ${PORT:-3000}
+EXPOSE ${PORT:-7860}
 
 ENTRYPOINT ["pnpm", "run", "start"]
