@@ -1,4 +1,4 @@
-import { Pool, Client, QueryResult } from 'pg';
+import { Pool } from 'pg';
 import Database from 'better-sqlite3';
 import { URL } from 'url';
 import path from 'path';
@@ -67,16 +67,14 @@ export class DB {
     uri: string,
     dsnModifiers: DSNModifier[] = []
   ): Promise<void> {
-    if (DB.initialised) {
-      return;
-    }
+    if (DB.initialised) return;
+
     try {
       this.uri = parseConnectionURI(uri);
       this.dsnModifiers = dsnModifiers;
       await this.open();
       await this.ping();
 
-      // create tables
       for (const [name, schema] of Object.entries(TABLES)) {
         const createTableQuery = `CREATE TABLE IF NOT EXISTS ${name} (${schema})`;
         await this.execute(createTableQuery);
@@ -100,19 +98,17 @@ export class DB {
 
   async open(): Promise<void> {
     if (this.uri.dialect === 'postgres') {
-      const pool = new Pool({
+      this.db = new Pool({
         connectionString: this.uri.url.toString(),
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
       });
-      this.db = pool;
     } else if (this.uri.dialect === 'sqlite') {
       const parentDir = path.dirname(this.uri.filename);
       if (parentDir && !fs.existsSync(parentDir)) {
         fs.mkdirSync(parentDir, { recursive: true });
       }
       logger.debug(`Opening SQLite database: ${this.uri.filename}`);
-
       this.db = new Database(this.uri.filename);
     }
   }
@@ -138,24 +134,22 @@ export class DB {
 
     if (this.uri.dialect === 'postgres') {
       return (this.db as Pool).query(adaptedQuery, params);
-    } else if (this.uri.dialect === 'sqlite') {
+    } else {
       const stmt = (this.db as Database.Database).prepare(adaptedQuery);
       return stmt.run(params || []);
     }
-    throw new Error('Unsupported dialect');
   }
 
-  async query(query: string, params?: any[]): Promise<any[]> {
+  async query<T = QueryResultRow>(query: string, params?: any[]): Promise<T[]> {
     const adaptedQuery = adaptQuery(query, this.uri.dialect);
 
     if (this.uri.dialect === 'postgres') {
       const result = await (this.db as Pool).query(adaptedQuery, params);
       return result.rows;
-    } else if (this.uri.dialect === 'sqlite') {
+    } else {
       const stmt = (this.db as Database.Database).prepare(adaptedQuery);
-      return stmt.all(params || []);
+      return stmt.all(params || []) as T[];
     }
-    return [];
   }
 
   async begin(): Promise<Transaction> {
@@ -164,7 +158,6 @@ export class DB {
       await client.query('BEGIN');
 
       let finalised = false;
-
       const finalise = () => {
         if (!finalised) {
           finalised = true;
@@ -174,18 +167,10 @@ export class DB {
 
       return {
         commit: async () => {
-          try {
-            await client.query('COMMIT');
-          } finally {
-            finalise();
-          }
+          try { await client.query('COMMIT'); } finally { finalise(); }
         },
         rollback: async () => {
-          try {
-            await client.query('ROLLBACK');
-          } finally {
-            finalise();
-          }
+          try { await client.query('ROLLBACK'); } finally { finalise(); }
         },
         execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
           const result = await client.query(adaptQuery(query, 'postgres'), params);
@@ -196,7 +181,7 @@ export class DB {
           };
         },
       };
-    } else if (this.uri.dialect === 'sqlite') {
+    } else {
       (this.db as Database.Database).exec('BEGIN');
       let isFinalised = false;
 
@@ -212,31 +197,21 @@ export class DB {
           isFinalised = true;
         },
         execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
-          if (isFinalised) {
-            throw new Error('Transaction has already been finalised.');
-          }
+          if (isFinalised) throw new Error('Transaction has already been finalised.');
+
           const adaptedQuery = adaptQuery(query, 'sqlite');
           const command = adaptedQuery.trim().split(' ')[0].toUpperCase();
           const stmt = (this.db as Database.Database).prepare(adaptedQuery);
 
           if (['INSERT', 'UPDATE', 'DELETE'].includes(command)) {
             const result = stmt.run(params || []);
-            return {
-              rows: [],
-              rowCount: result.changes || 0,
-              command,
-            };
+            return { rows: [], rowCount: result.changes || 0, command };
           } else {
             const rows = stmt.all(params || []);
-            return {
-              rows,
-              rowCount: rows.length,
-              command,
-            };
+            return { rows, rowCount: rows.length, command };
           }
         },
       };
     }
-    throw new Error('Unsupported transaction dialect');
   }
 }
