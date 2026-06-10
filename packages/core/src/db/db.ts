@@ -1,6 +1,5 @@
 import { Pool, Client, QueryResult } from 'pg';
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import Database from 'better-sqlite3';
 import { URL } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -30,7 +29,7 @@ type Transaction = {
 
 export class DB {
   private static instance: DB;
-  private db!: Pool | Database<any>;
+  private db!: Pool | Database.Database;
   private static initialised: boolean = false;
   private static dialect: DBDialect;
   private uri!: ConnectionURI;
@@ -44,6 +43,7 @@ export class DB {
     }
     return this.instance;
   }
+
   isInitialised(): boolean {
     return DB.initialised;
   }
@@ -83,10 +83,10 @@ export class DB {
       }
 
       if (this.uri.dialect === 'sqlite') {
-        await this.execute('PRAGMA busy_timeout = 5000');
-        await this.execute('PRAGMA foreign_keys = ON');
-        await this.execute('PRAGMA synchronous = OFF');
-        await this.execute('PRAGMA journal_mode = WAL');
+        (this.db as Database.Database).pragma('busy_timeout = 5000');
+        (this.db as Database.Database).pragma('foreign_keys = ON');
+        (this.db as Database.Database).pragma('synchronous = OFF');
+        (this.db as Database.Database).pragma('journal_mode = WAL');
       }
 
       DB.initialised = true;
@@ -106,23 +106,14 @@ export class DB {
         connectionTimeoutMillis: 2000,
       });
       this.db = pool;
-      this.uri.dialect = 'postgres';
     } else if (this.uri.dialect === 'sqlite') {
-      // make parent directory if it does not exist
       const parentDir = path.dirname(this.uri.filename);
-      if (!parentDir) {
-        throw new Error('Invalid SQLite path');
-      }
-      if (!fs.existsSync(parentDir)) {
+      if (parentDir && !fs.existsSync(parentDir)) {
         fs.mkdirSync(parentDir, { recursive: true });
       }
       logger.debug(`Opening SQLite database: ${this.uri.filename}`);
 
-      this.db = await open({
-        filename: this.uri.filename,
-        driver: sqlite3.Database,
-      });
-      this.uri.dialect = 'sqlite';
+      this.db = new Database(this.uri.filename);
     }
   }
 
@@ -130,7 +121,7 @@ export class DB {
     if (this.uri.dialect === 'postgres') {
       await (this.db as Pool).end();
     } else if (this.uri.dialect === 'sqlite') {
-      await (this.db as Database<any>).close();
+      (this.db as Database.Database).close();
     }
   }
 
@@ -138,32 +129,31 @@ export class DB {
     if (this.uri.dialect === 'postgres') {
       await (this.db as Pool).query('SELECT 1');
     } else if (this.uri.dialect === 'sqlite') {
-      await (this.db as Database<any>).get('SELECT 1');
+      (this.db as Database.Database).prepare('SELECT 1').get();
     }
   }
 
   async execute(query: string, params?: any[]): Promise<any> {
+    const adaptedQuery = adaptQuery(query, this.uri.dialect);
+
     if (this.uri.dialect === 'postgres') {
-      return (this.db as Pool).query(
-        adaptQuery(query, this.uri.dialect),
-        params
-      );
+      return (this.db as Pool).query(adaptedQuery, params);
     } else if (this.uri.dialect === 'sqlite') {
-      return (this.db as Database<any>).run(
-        adaptQuery(query, this.uri.dialect),
-        params
-      );
+      const stmt = (this.db as Database.Database).prepare(adaptedQuery);
+      return stmt.run(params || []);
     }
     throw new Error('Unsupported dialect');
   }
 
   async query(query: string, params?: any[]): Promise<any[]> {
     const adaptedQuery = adaptQuery(query, this.uri.dialect);
+
     if (this.uri.dialect === 'postgres') {
       const result = await (this.db as Pool).query(adaptedQuery, params);
       return result.rows;
     } else if (this.uri.dialect === 'sqlite') {
-      return (this.db as Database<any>).all(adaptedQuery, params);
+      const stmt = (this.db as Database.Database).prepare(adaptedQuery);
+      return stmt.all(params || []);
     }
     return [];
   }
@@ -197,14 +187,8 @@ export class DB {
             finalise();
           }
         },
-        execute: async (
-          query: string,
-          params?: any[]
-        ): Promise<UnifiedQueryResult> => {
-          const result = await client.query(
-            adaptQuery(query, 'postgres'),
-            params
-          );
+        execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
+          const result = await client.query(adaptQuery(query, 'postgres'), params);
           return {
             rows: result.rows,
             rowCount: result.rowCount || 0,
@@ -213,50 +197,41 @@ export class DB {
         },
       };
     } else if (this.uri.dialect === 'sqlite') {
-      // For sqlite, we manually manage the transaction state.
-      await (this.db as Database<any>).exec('BEGIN');
+      (this.db as Database.Database).exec('BEGIN');
       let isFinalised = false;
 
       return {
         commit: async () => {
           if (isFinalised) return;
-          await (this.db as Database<any>).exec('COMMIT');
+          (this.db as Database.Database).exec('COMMIT');
           isFinalised = true;
         },
         rollback: async () => {
           if (isFinalised) return;
-          await (this.db as Database<any>).exec('ROLLBACK');
+          (this.db as Database.Database).exec('ROLLBACK');
           isFinalised = true;
         },
-        execute: async (
-          query: string,
-          params?: any[]
-        ): Promise<UnifiedQueryResult> => {
+        execute: async (query: string, params?: any[]): Promise<UnifiedQueryResult> => {
           if (isFinalised) {
             throw new Error('Transaction has already been finalised.');
           }
           const adaptedQuery = adaptQuery(query, 'sqlite');
           const command = adaptedQuery.trim().split(' ')[0].toUpperCase();
+          const stmt = (this.db as Database.Database).prepare(adaptedQuery);
 
           if (['INSERT', 'UPDATE', 'DELETE'].includes(command)) {
-            const result = await (this.db as Database<any>).run(
-              adaptedQuery,
-              params
-            );
+            const result = stmt.run(params || []);
             return {
               rows: [],
               rowCount: result.changes || 0,
-              command: command,
+              command,
             };
           } else {
-            const rows = await (this.db as Database<any>).all(
-              adaptedQuery,
-              params
-            );
+            const rows = stmt.all(params || []);
             return {
-              rows: rows,
+              rows,
               rowCount: rows.length,
-              command: command,
+              command,
             };
           }
         },

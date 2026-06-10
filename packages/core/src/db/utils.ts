@@ -30,7 +30,7 @@ function parseConnectionURI(uri: string): ConnectionURI {
 
   switch (url.protocol) {
     case 'sqlite:': {
-      driverName = 'sqlite3';
+      driverName = 'better-sqlite3';
       dialect = 'sqlite';
       let filename = url.pathname;
       if (url.hostname && url.hostname !== '.') {
