@@ -36,7 +36,7 @@ RUN pnpm run build
 
 # === PERBAIKAN MEMORI & BETTER-SQLITE3 ===
 RUN pnpm prune --prod
-RUN cd packages/core && pnpm rebuild better-sqlite3
+RUN pnpm rebuild better-sqlite3 --build-from-source
 
 
 FROM base AS final
