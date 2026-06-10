@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -31,7 +34,7 @@ importers:
     dependencies:
       '@torbox/torbox-api':
         specifier: github:viren070/torbox-sdk-js#dist
-        version: https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/dc1d0bc148dd35fa5e5d39f699f070aadeccad5c
+        version: https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/82fb4eb14ccd3a0372fb445f796fa49527960cdd
       '@viren070/parse-torrent-title':
         specifier: ^0.5.1
         version: 0.5.1
@@ -1825,8 +1828,8 @@ packages:
     resolution: {integrity: sha512-Q53KyCXweV1CS62EfqtPDqfpksn5keQ59PGqzzkK+g8Vif1jB4inoBCcs/BUSdsqddhE3G+2Fn+4RX3S6RqT0A==}
     engines: {node: '>=0.2.6'}
 
-  '@torbox/torbox-api@https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/dc1d0bc148dd35fa5e5d39f699f070aadeccad5c':
-    resolution: {tarball: https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/dc1d0bc148dd35fa5e5d39f699f070aadeccad5c}
+  '@torbox/torbox-api@https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/82fb4eb14ccd3a0372fb445f796fa49527960cdd':
+    resolution: {tarball: https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/82fb4eb14ccd3a0372fb445f796fa49527960cdd}
     version: 1.0.9
 
   '@tsconfig/node10@1.0.12':
@@ -1846,6 +1849,9 @@ packages:
 
   '@types/bcrypt@5.0.2':
     resolution: {integrity: sha512-6atioO8Y75fNcbmj0G7UjI9lXN2pQ/IGJ2FWT4a/btd0Lk9lQalHLKhkgKVZ3r+spnmWUKfbMi1GEe9wyHQfNQ==}
+
+  '@types/better-sqlite3@7.6.13':
+    resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -6145,7 +6151,7 @@ snapshots:
     dependencies:
       uint8-util: 2.2.5
 
-  '@torbox/torbox-api@https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/dc1d0bc148dd35fa5e5d39f699f070aadeccad5c':
+  '@torbox/torbox-api@https://codeload.github.com/viren070/torbox-sdk-js/tar.gz/82fb4eb14ccd3a0372fb445f796fa49527960cdd':
     dependencies:
       zod: 3.22.0
 
@@ -6163,6 +6169,10 @@ snapshots:
     optional: true
 
   '@types/bcrypt@5.0.2':
+    dependencies:
+      '@types/node': 20.19.26
+
+  '@types/better-sqlite3@7.6.13':
     dependencies:
       '@types/node': 20.19.26
 
