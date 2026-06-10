@@ -95,14 +95,13 @@ export class TorboxDebridService implements DebridService {
 
       const batchResults = await Promise.all(
         batches.map(async (batch) => {
-          // @ts-ignore
           const result =
             await this.torboxApi.usenet.getUsenetCachedAvailability(
               this.apiVersion,
               {
                 hash: batch.join(','),
                 format: 'list',
-              }
+              } as any
             );
           if (!result.data?.success) {
             throw new DebridError(`Failed to check instant availability`, {
