@@ -1,9 +1,9 @@
 packages:
   - packages/*
-
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - bcrypt
+  - better-sqlite3
   - bufferutil
   - esbuild
   - go-ptt
