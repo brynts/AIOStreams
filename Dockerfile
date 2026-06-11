@@ -53,8 +53,9 @@ COPY --from=builder /build/packages/server/dist ./packages/server/dist
 COPY --from=builder /build/packages/server/src/static ./packages/server/dist/static
 COPY --from=builder /build/resources ./resources
 
+# === INI VERSI PALING PAKSA ===
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
-RUN pnpm rebuild better-sqlite3
+RUN cd packages/core && pnpm rebuild better-sqlite3 --build-from-source
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:${PORT:-7860}/api/v1/status || exit 1
