@@ -99,11 +99,7 @@ async function start() {
       startAutoPrune();
     }
     initialiseAuth();
-    const server = app.listen(Env.PORT, (error) => {
-      if (error) {
-        logger.error('Failed to start server:', error);
-        process.exit(1);
-      }
+    const server = app.listen(Env.PORT, () => {
       logger.info(
         `Server running on port ${Env.PORT}: ${JSON.stringify(server.address())}`
       );
