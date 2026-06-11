@@ -1,5 +1,19 @@
 packages:
   - packages/*
+allowBuilds:
+  '@tailwindcss/oxide': true
+  bcrypt: true
+  better-sqlite3: true
+  bufferutil: true
+  esbuild: true
+  go-ptt: true
+  node-datachannel: true
+  protobufjs: true
+  sharp: true
+  sqlite3: true
+  unrs-resolver: true
+  utf-8-validate: true
+  utp-native: true
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - bcrypt
