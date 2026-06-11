@@ -6,7 +6,6 @@ RUN corepack enable
 
 FROM base AS builder
 
-# Build tools untuk native module
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -32,10 +31,6 @@ COPY LICENSE ./
 
 RUN pnpm run build
 
-RUN rm -rf node_modules packages/*/node_modules
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
-RUN pnpm rebuild better-sqlite3
-
 
 FROM base AS final
 
@@ -58,10 +53,8 @@ COPY --from=builder /build/packages/server/dist ./packages/server/dist
 COPY --from=builder /build/packages/server/src/static ./packages/server/dist/static
 COPY --from=builder /build/resources ./resources
 
-COPY --from=builder /build/node_modules ./node_modules
-COPY --from=builder /build/packages/core/node_modules ./packages/core/node_modules
-COPY --from=builder /build/packages/server/node_modules ./packages/server/node_modules
-COPY --from=builder /build/packages/frontend/node_modules ./packages/frontend/node_modules
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN pnpm rebuild better-sqlite3
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:${PORT:-7860}/api/v1/status || exit 1
