@@ -32,8 +32,8 @@ COPY LICENSE ./
 
 RUN pnpm run build
 
-# Prune + rebuild (tanpa --build-from-source)
-RUN pnpm prune --prod
+RUN rm -rf node_modules packages/*/node_modules
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 RUN pnpm rebuild better-sqlite3
 
 
