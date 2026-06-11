@@ -137,7 +137,7 @@ class TorboxSearchApi {
       response = await fetch(url.toString(), {
         ...options,
         method,
-        headers,
+        headers: headers as HeadersInit,
         signal: AbortSignal.timeout(TorboxSearchApi.timeout),
         body: body ? JSON.stringify(body) : undefined,
       });
